@@ -1,19 +1,27 @@
 require 'stringio'
 require 'flog'
 
-class Ruby19Parser < RubyParser
-  def process(ruby, file)
-    ruby.gsub!(/(\w+):\s+/, '"\1" =>')
-    super(ruby, file)
-  end
-end unless defined?(:Ruby19Parser)
+PARSER_VERSION = RUBY_VERSION.split(".").first(2).join("")
+RUBY_PARSER_VERSION = "Ruby#{PARSER_VERSION}Parser"
+FLOG_VERSION = "Flog#{PARSER_VERSION}"
 
-class Flog19 < Flog
+unless defined?(RUBY_PARSER_VERSION.to_sym)
+  parser_klass = Class.new(RubyParser) do
+    def process(ruby, file)
+      ruby.gsub!(/(\w+):\s+/, '"\1" =>')
+      super(ruby, file)
+    end
+  end
+  Object.const_set(RUBY_PARSER_VERSION, parser_klass)
+end
+
+flog_klass = Class.new(Flog) do
   def initialize option = {}
     super(option)
-    @parser = Ruby19Parser.new
+    @parser = Object.const_get(RUBY_PARSER_VERSION).send(:new)
   end
 end
+Object.const_set(FLOG_VERSION, flog_klass)
 
 class Turbulence
   module Calculators
@@ -26,7 +34,7 @@ class Turbulence
       end
 
       def flogger
-        @flogger ||= Flog19.new(:continue => true)
+        @flogger ||= Object.const_get(FLOG_VERSION).send(:new, continue: true)
       end
 
       def for_these_files(files)
